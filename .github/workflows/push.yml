@@ -1,0 +1,44 @@
+name: Push
+
+on:
+  push:
+    branches: ["*"]
+  pull_request:
+
+jobs:
+  lint:
+    name: Lint code
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Lint Go Code
+        uses: golangci/golangci-lint-action@v2
+        with:
+          args: --enable golint,unparam,misspell
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go 1.16
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.16
+        id: go
+
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Execute local tests
+        run: go test -v -coverprofile=cover.out -cover ./...
+
+      - name: Generate coverage report
+        run: go tool cover -html=cover.out -o coverage.html
+
+      - name: Upload code coverage report
+        uses: actions/upload-artifact@v1
+        with:
+          name: code-coverage-report-${{ matrix.go }}
+          path: coverage.html
