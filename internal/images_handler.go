@@ -9,6 +9,7 @@ import (
 )
 
 var (
+	// ErrCannotFindFile describes error when request form does not contains the 'file' key
 	ErrCannotFindFile = errors.New("cannot find 'file'")
 )
 

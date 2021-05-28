@@ -45,7 +45,7 @@ func Run() {
 	go func() {
 		log.Printf("listening on %s", srv.Addr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Println(err)
+			log.Errorln(err)
 		}
 	}()
 

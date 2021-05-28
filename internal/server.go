@@ -11,7 +11,7 @@ var _ http.Handler = (*server)(nil)
 type HandlerFuncWithError func(http.ResponseWriter, *http.Request) error
 
 const (
-	BucketNameImages = "images"
+	bucketNameImages = "images"
 )
 
 // server handle our global server instance logic
@@ -33,7 +33,7 @@ func newServer(domain string) *server {
 	s.middlewares() // declare our middlewares
 
 	// Inject dependencies
-	s.Image = newImageService(newMinio(BucketNameImages), BucketNameImages, s.GenerateDownloadURL(domain))
+	s.Image = newImageService(newMinio(bucketNameImages), bucketNameImages, s.GenerateDownloadURL(domain))
 
 	return s
 }

@@ -20,7 +20,10 @@ var _ ImageService = (*imageService)(nil)
 var supportedContentTypes = []string{"image/jpeg", "image/png", "image/svg+xml"}
 
 var (
-	ErrImageNotFound          = errors.New("image not found")
+	// ErrImageNotFound file not found
+	ErrImageNotFound = errors.New("image not found")
+
+	// ErrUnsupportedContentType file content type not supported. See supportedContentTypes
 	ErrUnsupportedContentType = fmt.Errorf("unsupported content type: [%s]", strings.Join(supportedContentTypes, ", "))
 )
 
