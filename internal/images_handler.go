@@ -3,9 +3,12 @@ package internal
 import (
 	"errors"
 	"fmt"
-	"io"
+	"mime/multipart"
 	"net/http"
-	"strconv"
+
+	"github.com/gin-gonic/gin/binding"
+
+	"github.com/gin-gonic/gin"
 )
 
 var (
@@ -13,89 +16,92 @@ var (
 	ErrCannotFindFile = errors.New("cannot find 'file'")
 )
 
-func (s *server) handleImagesList(w http.ResponseWriter, req *http.Request) error {
-	images, err := s.Image.List(req.Context())
-	if err != nil {
-		return err
-	}
-
-	return s.respond(w, req, images, http.StatusOK)
+// uploadImageForm describes expected request form to properly upload an image
+// https://pkg.go.dev/github.com/go-playground/validator?utm_source=godoc#hdr-Baked_In_Validators_and_Tags
+type uploadImageForm struct {
+	Name        string                `form:"name" binding:"-"`
+	Description string                `form:"description" binding:"-"`
+	Header      *multipart.FileHeader `form:"file" binding:"required"`
 }
 
-func (s *server) handleImagesGet(w http.ResponseWriter, req *http.Request) error {
-	imageUUID := imageIDFromContext(req.Context())
-	image, err := s.Image.Get(req.Context(), imageUUID)
+func (s *server) handleImagesList(c *gin.Context) {
+	images, err := s.Image.List(c.Request.Context())
 	if err != nil {
-		switch {
-		case errors.Is(err, ErrImageNotFound):
-			return newNotFoundError(err)
-		default:
-			return err
-		}
+		_ = c.Error(err)
+		return
 	}
 
-	return s.respond(w, req, image, http.StatusOK)
+	c.JSON(http.StatusOK, images)
 }
 
-func (s *server) handleImagesCreate(w http.ResponseWriter, req *http.Request) error {
-	if err := req.ParseMultipartForm(10 << 20); err != nil { // 10MB
-		switch {
-		case errors.Is(err, http.ErrNotMultipart):
-			return newBadRequestError(err)
-		default:
-			return err
-		}
-	}
-
-	f, header, err := req.FormFile("file")
+func (s *server) handleImagesGet(c *gin.Context) {
+	image, err := s.Image.Get(c.Request.Context(), c.Param("image"))
 	if err != nil {
-		switch {
-		case errors.Is(err, http.ErrMissingFile):
-			return newBadRequestError(ErrCannotFindFile)
-		default:
-			return err
+		if errors.Is(err, ErrImageNotFound) {
+			err = newNotFoundError(err)
 		}
-	}
-	defer f.Close()
 
-	image, err := s.Image.Create(req.Context(), newImage(req.PostFormValue("name"), req.PostFormValue("description"), &f, header))
-	if err != nil {
-		switch {
-		case errors.Is(err, ErrUnsupportedContentType):
-			return newUnsupportedMediaType(err)
-		default:
-			return err
-		}
+		_ = c.Error(err)
+		return
 	}
 
-	return s.respond(w, req, image, http.StatusCreated)
+	c.JSON(http.StatusOK, image)
 }
 
-func (s *server) handleImagesDelete(w http.ResponseWriter, req *http.Request) error {
-	imageUUID := imageIDFromContext(req.Context())
-	if err := s.Image.Delete(req.Context(), imageUUID); err != nil {
-		return err
+func (s *server) handleImagesCreate(c *gin.Context) {
+	var form uploadImageForm
+	if err := c.ShouldBindWith(&form, binding.Form); err != nil {
+		_ = c.Error(newBadRequestError(err))
+		return
 	}
 
-	return s.respond(w, req, nil, http.StatusNoContent)
+	// create image object
+	image, err := newImage(form.Name, form.Description, form.Header)
+	if err != nil {
+		if errors.Is(err, http.ErrMissingFile) {
+			err = newBadRequestError(ErrCannotFindFile)
+		}
+
+		_ = c.Error(err)
+		return
+	}
+
+	// upload it!
+
+	image, err = s.Image.Create(c.Request.Context(), image)
+	if err != nil {
+		if errors.Is(err, ErrUnsupportedContentType) {
+			err = newUnsupportedMediaType(err)
+		}
+
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusCreated, image)
 }
 
-func (s *server) handleImagesDownload(w http.ResponseWriter, req *http.Request) error {
-	imageUUID := imageIDFromContext(req.Context())
-	image, err := s.Image.Get(req.Context(), imageUUID)
-	if err != nil {
-		switch {
-		case errors.Is(err, ErrImageNotFound):
-			return newNotFoundError(err)
-		default:
-			return err
-		}
+func (s *server) handleImagesDelete(c *gin.Context) {
+	if err := s.Image.Delete(c.Request.Context(), c.Param("image")); err != nil {
+		_ = c.Error(err)
+		return
 	}
 
-	// https://stackoverflow.com/a/24116517
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", image.Name))
-	w.Header().Set("Content-Type", image.ContentType)
-	w.Header().Set("Content-Length", strconv.FormatInt(image.Size, 10))
-	_, err = io.Copy(w, image.Content)
-	return err
+	c.Status(http.StatusNoContent)
+}
+
+func (s *server) handleImagesDownload(c *gin.Context) {
+	image, err := s.Image.Get(c.Request.Context(), c.Param("image"))
+	if err != nil {
+		if errors.Is(err, ErrImageNotFound) {
+			err = newNotFoundError(err)
+		}
+
+		_ = c.Error(err)
+		return
+	}
+
+	c.DataFromReader(http.StatusOK, image.Size, image.ContentType, image.Content, map[string]string{
+		"Content-Disposition": fmt.Sprintf("attachment; filename=%q", image.Name),
+	})
 }

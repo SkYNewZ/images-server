@@ -4,29 +4,25 @@ import (
 	"net/http"
 
 	log "github.com/sirupsen/logrus"
+
+	"github.com/gin-gonic/gin"
 )
 
-// loggingMiddleware enables http access log
-func loggingMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.WithFields(log.Fields{
-			"method":      r.Method,
-			"request_uri": r.RequestURI,
-			"user_agent":  r.UserAgent(),
-		}).Printf("%s %s", r.Method, r.RequestURI)
-		next.ServeHTTP(w, r)
-	})
-}
+func (s *server) Recover(c *gin.Context, err interface{}) {
+	e := new(Error)
+	e.Code = http.StatusInternalServerError
+	e.Message = "Unexpected error occurred. Check logs for more details"
 
-// responseContentTypeMiddleware defines JSON as default returned Content-Type
-func responseContentTypeMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-type", "application/json; charset=utf-8")
-		next.ServeHTTP(w, r)
-	})
+	if err, ok := err.(string); ok {
+		e.Message = err
+	}
+
+	log.Errorln(err)
+	c.AbortWithStatusJSON(e.Code, e)
 }
 
 func (s *server) middlewares() {
-	s.router.Use(loggingMiddleware)
-	s.router.Use(responseContentTypeMiddleware)
+	s.router.Use(gin.Logger())
+	s.router.Use(gin.CustomRecovery(s.Recover))
+	// TODO: use custom logger ?
 }

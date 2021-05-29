@@ -3,7 +3,7 @@ package internal
 import (
 	"net/http"
 
-	"github.com/gorilla/mux"
+	"github.com/gin-gonic/gin"
 )
 
 var _ http.Handler = (*server)(nil)
@@ -14,10 +14,12 @@ const (
 	bucketNameImages = "images"
 )
 
+var ginMode = gin.ReleaseMode
+
 // server handle our global server instance logic
 // Inspired by https://youtu.be/rWBSMsLG8po?t=613
 type server struct {
-	router *mux.Router
+	router *gin.Engine
 	Image  ImageService
 }
 
@@ -27,13 +29,25 @@ func (s *server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func newServer(domain string) *server {
+	// Set default gin mode to release
+	gin.SetMode(ginMode)
+
 	s := new(server)
-	s.router = mux.NewRouter()
+	s.router = gin.New()
+	s.router.HandleMethodNotAllowed = true
+	s.router.MaxMultipartMemory = 5 << 20 // 5MB
+
 	s.routes()      // declare our routes
 	s.middlewares() // declare our middlewares
 
 	// Inject dependencies
-	s.Image = newImageService(newMinio(bucketNameImages), bucketNameImages, s.GenerateDownloadURL(domain))
+	s.Image = &imageService{
+		Minio:      newMinio(bucketNameImages),
+		BucketName: bucketNameImages,
+		GenerateDownloadRouteFunc: func(s string) string {
+			return "TODO"
+		},
+	}
 
 	return s
 }

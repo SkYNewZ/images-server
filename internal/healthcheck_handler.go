@@ -2,12 +2,15 @@ package internal
 
 import (
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
-func (s *server) handleHealthCheck(w http.ResponseWriter, r *http.Request) error {
+func (s *server) handleHealthCheck(c *gin.Context) {
 	data := map[string]interface{}{
 		"ok":      true,
 		"version": buildNumber,
 	}
-	return s.respond(w, r, data, http.StatusOK)
+
+	c.JSON(http.StatusOK, data)
 }

@@ -50,23 +50,29 @@ func (i *Image) validateContentType() error {
 }
 
 // newImage create a new Image
-func newImage(name string, description string, file *multipart.File, header *multipart.FileHeader) *Image {
+func newImage(name string, description string, header *multipart.FileHeader) (*Image, error) {
+	// Read the file
+	f, err := header.Open()
+	if err != nil {
+		return nil, err
+	}
+
 	// Default name is the filename
-	var objectName = header.Filename
+	var objectName = filepath.Base(header.Filename)
 
 	// If user specified a custom name, use it and append the original file extension
 	if name != "" {
-		objectName = name + filepath.Ext(header.Filename)
+		objectName = name + filepath.Ext(objectName)
 	}
 
 	return &Image{
 		Name:        objectName,
 		Description: description,
 		DownloadURL: "",
-		Content:     *file,
+		Content:     f,
 		Size:        header.Size,
 		ContentType: header.Header.Get("Content-Type"),
-	}
+	}, nil
 }
 
 // ImageService describes available operations on Image
@@ -88,10 +94,6 @@ type imageService struct {
 	Minio                     *minio.Client             //  Minio is S3 compatible so we can safely use it
 	BucketName                string                    // Bucket to work with
 	GenerateDownloadRouteFunc GenerateDownloadRouteFunc // Helper func to generate download URLs
-}
-
-func newImageService(minio *minio.Client, bucketName string, generateDownloadRouteFunc GenerateDownloadRouteFunc) *imageService {
-	return &imageService{Minio: minio, BucketName: bucketName, GenerateDownloadRouteFunc: generateDownloadRouteFunc}
 }
 
 func (i *imageService) Create(ctx context.Context, image *Image) (*Image, error) {

@@ -15,10 +15,6 @@ import (
 
 var buildNumber = "dev"
 
-func init() {
-	log.SetLevel(log.DebugLevel)
-}
-
 // Run starts our server
 func Run() {
 	var port = "8080"

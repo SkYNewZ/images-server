@@ -3,6 +3,7 @@ module github.com/SkYNewZ/images-server
 go 1.16
 
 require (
+	github.com/gin-gonic/gin v1.7.2
 	github.com/go-ini/ini v1.62.0 // indirect
 	github.com/gorilla/mux v1.8.0
 	github.com/minio/minio-go v6.0.14+incompatible
