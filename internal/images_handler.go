@@ -50,7 +50,7 @@ func (s *server) handleImagesGet(c *gin.Context) {
 
 func (s *server) handleImagesCreate(c *gin.Context) {
 	var form uploadImageForm
-	if err := c.ShouldBindWith(&form, binding.Form); err != nil {
+	if err := c.ShouldBindWith(&form, binding.FormMultipart); err != nil {
 		_ = c.Error(newBadRequestError(err))
 		return
 	}

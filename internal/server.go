@@ -44,9 +44,6 @@ func newServer(domain string) *server {
 	s.Image = &imageService{
 		Minio:      newMinio(bucketNameImages),
 		BucketName: bucketNameImages,
-		GenerateDownloadRouteFunc: func(s string) string {
-			return "TODO"
-		},
 	}
 
 	return s

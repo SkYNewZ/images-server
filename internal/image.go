@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -27,7 +28,7 @@ var (
 	ErrUnsupportedContentType = fmt.Errorf("unsupported content type: [%s]", strings.Join(supportedContentTypes, ", "))
 )
 
-type GenerateDownloadRouteFunc func(string) string
+type mustMakeDownloadURL func(string) string
 
 // Image describes our base image type
 type Image struct {
@@ -91,9 +92,8 @@ type ImageService interface {
 }
 
 type imageService struct {
-	Minio                     *minio.Client             //  Minio is S3 compatible so we can safely use it
-	BucketName                string                    // Bucket to work with
-	GenerateDownloadRouteFunc GenerateDownloadRouteFunc // Helper func to generate download URLs
+	Minio      *minio.Client //  Minio is S3 compatible so we can safely use it
+	BucketName string        // Bucket to work with
 }
 
 func (i *imageService) Create(ctx context.Context, image *Image) (*Image, error) {
@@ -111,7 +111,7 @@ func (i *imageService) Create(ctx context.Context, image *Image) (*Image, error)
 		return nil, err
 	}
 
-	image.DownloadURL = i.GenerateDownloadRouteFunc(image.Name)
+	image.DownloadURL = i.mustMakeDownloadURL(image.Name)
 	return image, nil
 }
 
@@ -179,7 +179,20 @@ func (i *imageService) makeImage(object *minio.ObjectInfo) *Image {
 		Content:     nil,
 		ContentType: object.ContentType,
 		Description: object.Metadata.Get("X-Amz-Meta-Description"),
-		DownloadURL: i.GenerateDownloadRouteFunc(object.Key),
+		DownloadURL: i.mustMakeDownloadURL(object.Key),
 		Size:        object.Size,
 	}
+}
+
+// mustMakeDownloadURL use the native Minio feature to generate download links
+// each URLs will be available 7 days.
+// TODO: better way ?
+func (i *imageService) mustMakeDownloadURL(name string) string {
+	d, _ := time.ParseDuration("604800s") // 7 days
+	u, err := i.Minio.PresignedGetObject(i.BucketName, name, d, nil)
+	if err != nil {
+		log.Panicf("cannot generate presigned URL: %v", err)
+	}
+
+	return u.String()
 }
