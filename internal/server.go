@@ -3,6 +3,7 @@ package internal
 import (
 	"net/http"
 
+	"github.com/SkYNewZ/images-server/internal/minio"
 	"github.com/gin-gonic/gin"
 )
 
@@ -42,8 +43,7 @@ func newServer(domain string) *server {
 
 	// Inject dependencies
 	s.Image = &imageService{
-		Minio:      newMinio(bucketNameImages),
-		BucketName: bucketNameImages,
+		Minio: minio.New(bucketNameImages),
 	}
 
 	return s

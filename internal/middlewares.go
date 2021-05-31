@@ -11,6 +11,8 @@ import (
 const UUIDContextKey = "uuid"
 
 func (s *server) Recover(c *gin.Context, err interface{}) {
+	log.Errorln(err)
+
 	e := new(Error)
 	e.Code = http.StatusInternalServerError
 	e.Message = "Unexpected error occurred. Check logs for more details"
@@ -19,7 +21,6 @@ func (s *server) Recover(c *gin.Context, err interface{}) {
 		e.Message = err
 	}
 
-	log.Errorln(err)
 	c.AbortWithStatusJSON(e.Code, e)
 }
 
