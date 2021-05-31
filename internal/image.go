@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
-
+	"github.com/google/uuid"
 	"github.com/minio/minio-go"
+	log "github.com/sirupsen/logrus"
 )
 
 var _ ImageService = (*imageService)(nil)
@@ -32,6 +32,7 @@ type mustMakeDownloadURL func(string) string
 
 // Image describes our base image type
 type Image struct {
+	Key         uuid.UUID `json:"id"`
 	Name        string    `json:"name"`
 	Content     io.Reader `json:"-"`
 	ContentType string    `json:"-"`
@@ -67,6 +68,7 @@ func newImage(name string, description string, header *multipart.FileHeader) (*I
 	}
 
 	return &Image{
+		Key:         uuid.New(),
 		Name:        objectName,
 		Description: description,
 		DownloadURL: "",
@@ -82,13 +84,13 @@ type ImageService interface {
 	Create(ctx context.Context, image *Image) (*Image, error)
 
 	// Get return Image matching given uuid
-	Get(ctx context.Context, name string) (*Image, error)
+	Get(ctx context.Context, id uuid.UUID) (*Image, error)
 
 	// List returns a set of all images
 	List(ctx context.Context) ([]*Image, error)
 
 	// Delete deletes Image matching given uuid
-	Delete(ctx context.Context, name string) error
+	Delete(ctx context.Context, ids ...uuid.UUID) error
 }
 
 type imageService struct {
@@ -101,22 +103,23 @@ func (i *imageService) Create(ctx context.Context, image *Image) (*Image, error)
 		return nil, err
 	}
 
-	_, err := i.Minio.PutObjectWithContext(ctx, i.BucketName, image.Name, image.Content, image.Size, minio.PutObjectOptions{
+	_, err := i.Minio.PutObjectWithContext(ctx, i.BucketName, image.Key.String(), image.Content, image.Size, minio.PutObjectOptions{
 		ContentType: image.ContentType,
 		UserMetadata: map[string]string{
 			"description": image.Description,
+			"name":        image.Name,
 		},
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	image.DownloadURL = i.mustMakeDownloadURL(image.Name)
+	image.DownloadURL = i.mustMakeDownloadURL(image.Key.String())
 	return image, nil
 }
 
-func (i *imageService) Get(ctx context.Context, name string) (*Image, error) {
-	object, err := i.Minio.GetObject(i.BucketName, name, minio.GetObjectOptions{})
+func (i *imageService) Get(ctx context.Context, id uuid.UUID) (*Image, error) {
+	object, err := i.Minio.GetObject(i.BucketName, id.String(), minio.GetObjectOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +153,7 @@ func (i *imageService) List(ctx context.Context) ([]*Image, error) {
 			}
 
 			// Get the real object for metadata
-			image, err := i.Get(ctx, object.Key)
+			image, err := i.Get(ctx, uuid.MustParse(object.Key))
 			if err == nil { // no error, use it
 				images = append(images, image)
 				continue
@@ -169,13 +172,26 @@ func (i *imageService) List(ctx context.Context) ([]*Image, error) {
 	}
 }
 
-func (i *imageService) Delete(ctx context.Context, name string) error {
-	return i.Minio.RemoveObject(i.BucketName, name)
+func (i *imageService) Delete(ctx context.Context, ids ...uuid.UUID) error {
+	toDelete := make(chan string)
+	go func() {
+		defer close(toDelete)
+		for _, id := range ids {
+			toDelete <- id.String()
+		}
+	}()
+
+	for err := range i.Minio.RemoveObjectsWithContext(ctx, i.BucketName, toDelete) {
+		return err.Err
+	}
+
+	return nil
 }
 
 func (i *imageService) makeImage(object *minio.ObjectInfo) *Image {
 	return &Image{
-		Name:        object.Key,
+		Key:         uuid.MustParse(object.Key),
+		Name:        object.Metadata.Get("X-Amz-Meta-Name"),
 		Content:     nil,
 		ContentType: object.ContentType,
 		Description: object.Metadata.Get("X-Amz-Meta-Description"),
@@ -186,7 +202,6 @@ func (i *imageService) makeImage(object *minio.ObjectInfo) *Image {
 
 // mustMakeDownloadURL use the native Minio feature to generate download links
 // each URLs will be available 7 days.
-// TODO: better way ?
 func (i *imageService) mustMakeDownloadURL(name string) string {
 	d, _ := time.ParseDuration("604800s") // 7 days
 	u, err := i.Minio.PresignedGetObject(i.BucketName, name, d, nil)

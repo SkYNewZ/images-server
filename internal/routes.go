@@ -12,10 +12,7 @@ func (s *server) routes() {
 	{
 		imgs.GET("", s.handleImagesList)
 		imgs.POST("", s.handleImagesCreate)
-		imgs.GET("/:image", s.handleImagesGet)
-		imgs.DELETE("/:image", s.handleImagesDelete)
+		imgs.GET("/:image", s.BindUUID, s.handleImagesGet)
+		imgs.DELETE("/:image", s.BindUUID, s.handleImagesDelete)
 	}
-
-	// Download
-	s.router.GET("/download/:image", s.handleErrors, s.handleImagesDownload)
 }

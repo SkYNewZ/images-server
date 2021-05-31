@@ -2,13 +2,12 @@ package internal
 
 import (
 	"errors"
-	"fmt"
 	"mime/multipart"
 	"net/http"
 
-	"github.com/gin-gonic/gin/binding"
-
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
+	"github.com/google/uuid"
 )
 
 var (
@@ -35,7 +34,9 @@ func (s *server) handleImagesList(c *gin.Context) {
 }
 
 func (s *server) handleImagesGet(c *gin.Context) {
-	image, err := s.Image.Get(c.Request.Context(), c.Param("image"))
+
+	id, _ := c.Get(UUIDContextKey)
+	image, err := s.Image.Get(c.Request.Context(), id.(uuid.UUID))
 	if err != nil {
 		if errors.Is(err, ErrImageNotFound) {
 			err = newNotFoundError(err)
@@ -67,7 +68,6 @@ func (s *server) handleImagesCreate(c *gin.Context) {
 	}
 
 	// upload it!
-
 	image, err = s.Image.Create(c.Request.Context(), image)
 	if err != nil {
 		if errors.Is(err, ErrUnsupportedContentType) {
@@ -82,26 +82,11 @@ func (s *server) handleImagesCreate(c *gin.Context) {
 }
 
 func (s *server) handleImagesDelete(c *gin.Context) {
-	if err := s.Image.Delete(c.Request.Context(), c.Param("image")); err != nil {
+	id, _ := c.Get(UUIDContextKey)
+	if err := s.Image.Delete(c.Request.Context(), id.(uuid.UUID)); err != nil {
 		_ = c.Error(err)
 		return
 	}
 
 	c.Status(http.StatusNoContent)
-}
-
-func (s *server) handleImagesDownload(c *gin.Context) {
-	image, err := s.Image.Get(c.Request.Context(), c.Param("image"))
-	if err != nil {
-		if errors.Is(err, ErrImageNotFound) {
-			err = newNotFoundError(err)
-		}
-
-		_ = c.Error(err)
-		return
-	}
-
-	c.DataFromReader(http.StatusOK, image.Size, image.ContentType, image.Content, map[string]string{
-		"Content-Disposition": fmt.Sprintf("attachment; filename=%q", image.Name),
-	})
 }
