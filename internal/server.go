@@ -29,7 +29,7 @@ func (s *server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	s.router.ServeHTTP(w, req)
 }
 
-func newServer(domain string) *server {
+func newServer() *server {
 	// Set default gin mode to release
 	gin.SetMode(ginMode)
 

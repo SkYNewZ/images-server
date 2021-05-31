@@ -16,9 +16,9 @@ func (s *server) handleErrors(c *gin.Context) {
 
 	err := detectedErrors[0].Err
 	var e *Error
-	switch err.(type) {
+	switch v := err.(type) {
 	case *Error:
-		e = err.(*Error)
+		e = v
 	default:
 		e = &Error{
 			Code:    http.StatusInternalServerError,

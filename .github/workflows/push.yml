@@ -16,7 +16,7 @@ jobs:
       - name: Lint Go Code
         uses: golangci/golangci-lint-action@v2
         with:
-          args: --enable golint,unparam,misspell
+          args: --enable revive,unparam,misspell
 
   test:
     name: Tests

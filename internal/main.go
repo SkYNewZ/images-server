@@ -3,9 +3,7 @@ package internal
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"time"
@@ -22,17 +20,9 @@ func Run() {
 		port = v
 	}
 
-	// Domain for download URLs
-	var domain = fmt.Sprintf("http://localhost:%s", port)
-	if v, ok := os.LookupEnv("DOMAIN"); ok {
-		if u, err := url.Parse(v); err == nil {
-			domain = u.String()
-		}
-	}
-
 	srv := &http.Server{
 		Addr:         ":" + port,
-		Handler:      newServer(domain),
+		Handler:      newServer(),
 		WriteTimeout: time.Second * 15,
 		ReadTimeout:  time.Second * 15,
 		IdleTimeout:  time.Second * 60,
