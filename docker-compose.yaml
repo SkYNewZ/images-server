@@ -74,9 +74,9 @@ services:
     volumes:
       - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
     expose:
-      - "9000"
+      - 9000
     ports:
-      - 127.0.0.1:9000:9000
+      - 9000:9000 # Expose on all interfaces (host.docker.internal)
     depends_on:
       - minio1
       - minio2
@@ -89,7 +89,7 @@ services:
       PORT: 8080
       MINIO_USER: AKIAIOSFODNN7EXAMPLE
       MINIO_PASSWORD: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
-      MINIO_ENDPOINT: nginx:9000
+      MINIO_ENDPOINT: host.docker.internal:9000 # tips to make signed URL reachable by host
       MINIO_DISABLE_SSL: "true"
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8080/_health" ]
