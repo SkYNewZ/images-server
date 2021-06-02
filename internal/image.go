@@ -92,6 +92,7 @@ type ImageService interface {
 	Delete(ctx context.Context, ids ...uuid.UUID) error
 }
 
+// TODO: Use interface for testing
 type imageService struct {
 	Minio *minio.Client //  Minio is S3 compatible so we can safely use it
 }

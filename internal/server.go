@@ -9,8 +9,6 @@ import (
 
 var _ http.Handler = (*server)(nil)
 
-type HandlerFuncWithError func(http.ResponseWriter, *http.Request) error
-
 const (
 	bucketNameImages = "images"
 )
